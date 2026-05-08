@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>노선표 앱</title>
+  <style>
+    :root {
+      --bg: #eef2ff;
+      --surface: rgba(255,255,255,.88);
+      --surface-strong: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-soft: #dbeafe;
+      --chip: #e2e8f0;
+      --shadow: 0 10px 30px rgba(15, 23, 42, .12);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: linear-gradient(180deg, #dbeafe 0%, #eef2ff 28%, #f8fafc 100%); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif; }
+    body { min-height: 100vh; }
+    .app { max-width: 980px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
+    .hero { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(16px); background: rgba(238,242,255,.78); padding-top: 6px; }
+    .hero-card { background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #fff; padding: 20px; border-radius: 24px; box-shadow: var(--shadow); }
+    .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .78; }
+    h1 { margin: 8px 0 10px; font-size: clamp(28px, 5vw, 38px); line-height: 1.1; }
+    .subtitle { margin: 0; color: rgba(255,255,255,.84); font-size: 14px; }
+    .toolbar { margin-top: 14px; display: grid; gap: 12px; }
+    .searchbox { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.18); border-radius: 16px; padding: 12px 14px; }
+    .searchbox input { width: 100%; border: 0; outline: none; font-size: 16px; background: transparent; color: #fff; }
+    .searchbox input::placeholder { color: rgba(255,255,255,.65); }
+    .chips, .category-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    button { border: 0; cursor: pointer; }
+    .chip, .tab { border-radius: 999px; padding: 10px 14px; font-size: 14px; font-weight: 700; transition: .2s ease; }
+    .chip { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.16); }
+    .chip.active { background: #fff; color: var(--primary); }
+    .summary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin: 18px 0 6px; }
+    .metric { background: var(--surface); box-shadow: var(--shadow); border-radius: 18px; padding: 14px; }
+    .metric-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .metric-value { font-size: 22px; font-weight: 800; }
+    .content { padding-top: 16px; }
+    .section { margin-top: 24px; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .section-title { font-size: 22px; font-weight: 800; margin: 0; }
+    .section-count { color: var(--muted); font-size: 14px; }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    .card { background: var(--surface-strong); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); transition: transform .18s ease, box-shadow .18s ease; position: relative; }
+    .card:active { transform: scale(.98); }
+    .thumb-wrap { aspect-ratio: 3 / 4; background: linear-gradient(135deg, #dbeafe, #e2e8f0); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .img-fallback { padding: 12px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .caption { padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .caption-text { font-size: 16px; font-weight: 700; word-break: break-word; }
+    .caption-camp { font-size: 11px; color: var(--muted); background: #f1f5f9; border-radius: 999px; padding: 6px 8px; white-space: nowrap; }
+    .empty { display: none; margin-top: 28px; padding: 18px; background: rgba(255,255,255,.78); border-radius: 18px; text-align: center; color: var(--muted); box-shadow: var(--shadow); }
+    .footer-note { margin-top: 22px; font-size: 13px; color: var(--muted); text-align: center; }
+
+    .modal { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,.92); }
+    .modal.open { display: block; }
+    .modal-top { position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 8px; z-index: 2; }
+    .modal-btn { background: rgba(255,255,255,.14); color: #fff; padding: 10px 14px; border-radius: 999px; font-size: 14px; font-weight: 800; backdrop-filter: blur(10px); }
+    .modal-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
+    .zoom-shell { will-change: transform; transform-origin: center center; transition: transform .08s linear; }
+    .zoom-shell img { max-width: min(96vw, 1200px); max-height: 84vh; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+    .modal-caption { position: absolute; left: 16px; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); color: #fff; text-align: center; font-size: 15px; font-weight: 700; }
+
+    @media (min-width: 720px) {
+      .toolbar { grid-template-columns: 1.4fr 1fr; align-items: start; }
+      .summary { grid-template-columns: repeat(3, 160px); justify-content: start; }
+    }
+
+    @media (max-width: 520px) {
+      .app { padding-left: 12px; padding-right: 12px; }
+      .gallery { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .caption-text { font-size: 15px; }
+      .summary { grid-template-columns: repeat(3, minmax(0,1fr)); }
+      .metric-value { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Route Gallery</div>
+        <h1>노선표 앱</h1>
+        <p class="subtitle">검색, 캠프 필터, 오프라인 사용, 터치 확대/이동을 지원하는 안드로이드 웹뷰용 화면입니다.</p>
+        <div class="toolbar">
+          <label class="searchbox" aria-label="노선 검색">
+            <span>🔎</span>
+            <input id="searchInput" type="search" placeholder="노선명 검색 예: 125, 307, 413" autocomplete="off" />
+          </label>
+          <div>
+            <div class="category-tabs" id="campTabs"></div>
+            <div class="chips" id="letterChips" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary" aria-label="요약 정보">
+      <div class="metric"><div class="metric-label">전체 노선</div><div class="metric-value" id="totalCount">0</div></div>
+      <div class="metric"><div class="metric-label">현재 결과</div><div class="metric-value" id="visibleCount">0</div></div>
+      <div class="metric"><div class="metric-label">캠프 수</div><div class="metric-value" id="campCount">0</div></div>
+    </div>
+
+    <div class="content" id="content"></div>
+    <div class="empty" id="emptyState">검색 결과가 없습니다. 검색어 또는 필터를 바꿔보세요.</div>
+    <div class="footer-note">오프라인 모드: 안드로이드 assets 안에 HTML과 images 폴더를 함께 넣으면 네트워크 없이 동작합니다.</div>
+  </div>
+
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal-top">
+      <button class="modal-btn" id="zoomOutBtn">－</button>
+      <div style="display:flex; gap:8px;">
+        <button class="modal-btn" id="resetBtn">원래 크기</button>
+        <button class="modal-btn" id="zoomInBtn">＋</button>
+        <button class="modal-btn" id="closeBtn">닫기</button>
+      </div>
+    </div>
+    <div class="modal-stage" id="modalStage">
+      <div class="zoom-shell" id="zoomShell">
+        <img id="modalImg" alt="확대 이미지" />
+      </div>
+    </div>
+    <div class="modal-caption" id="modalCaption"></div>
+  </div>
+
+  <script>
+    const DATA = {
+  "3캠프": [
+    {
+      "src": "images/119A.jpg",
+      "text": "119A"
+    },
+    {
+      "src": "images/121A.jpg",
+      "text": "121A"
+    },
+    {
+      "src": "images/121B.jpg",
+      "text": "121B"
+    },
+    {
+      "src": "images/121C.jpg",
+      "text": "121C"
+    },
+    {
+      "src": "images/121D.jpg",
+      "text": "121D"
+    },
+    {
+      "src": "images/122A.jpg",
+      "text": "122A"
+    },
+    {
+      "src": "images/122B.jpg",
+      "text": "122B"
+    },
+    {
+      "src": "images/123A.jpg",
+      "text": "123A"
+    },
+    {
+      "src": "images/123B.jpg",
+      "text": "123B"
+    },
+    {
+      "src": "images/123C.jpg",
+      "text": "123C"
+    },
+    {
+      "src": "images/123D.jpg",
+      "text": "123D"
+    },
+    {
+      "src": "images/125.jpg",
+      "text": "125 라우트"
+    },
+    {
+      "src": "images/125A.jpg",
+      "text": "125A01,02 라우트"
+    },
+    {
+      "src": "images/125BC.jpg",
+      "text": "125BC 라우트"
+    },
+    {
+      "src": "images/125AD.jpg",
+      "text": "125A3,D 라우트"
+    },
+    {
+      "src": "images/126.jpg",
+      "text": "126 라우트"
+    },
+    {
+      "src": "images/126AB.jpg",
+      "text": "126AB"
+    },
+    {
+      "src": "images/126A01,D.jpg",
+      "text": "126A01,D"
+    },
+    {
+      "src": "images/126C.jpg",
+      "text": "126C"
+    },
+    {
+      "src": "images/131CD.jpg",
+      "text": "131CD"
+    },
+    {
+      "src": "images/132.jpg",
+      "text": "132A"
+    },
+    {
+      "src": "images/132AB.jpg",
+      "text": "132A01,02,B"
+    },
+    {
+      "src": "images/132A456.jpg",
+      "text": "132A 456"
+    },
+    {
+      "src": "images/134BCD.jpg",
+      "text": "134BCD"
+    }
+  ],
+  "5캠프": [
+    {
+      "src": "images/413A01,02.jpg",
+      "text": "413A"
+    },
+    {
+      "src": "images/413B힐스.jpg",
+      "text": "413B힐스"
+    },
+    {
+      "src": "images/413B자이.jpg",
+      "text": "413B자이"
+    },
+    {
+      "src": "images/413CD.jpg",
+      "text": "413CD"
+    },
+    {
+      "src": "images/413A3,414D.jpg",
+      "text": "413A3,414D"
+    },
+    {
+      "src": "images/414A.jpg",
+      "text": "414A"
+    },
+    {
+      "src": "images/414B.jpg",
+      "text": "414B"
+    },
+    {
+      "src": "images/414C.jpg",
+      "text": "414C"
+    },
+    {
+      "src": "images/301AB.jpg",
+      "text": "301AB"
+    },
+    {
+      "src": "images/301CD.jpg",
+      "text": "301CD"
+    },
+    {
+      "src": "images/302.jpg",
+      "text": "302"
+    },
+    {
+      "src": "images/302AD.jpg",
+      "text": "302AD"
+    },
+    {
+      "src": "images/302BC.jpg",
+      "text": "302BC"
+    },
+    {
+      "src": "images/303B.jpg",
+      "text": "303B"
+    },
+    {
+      "src": "images/303B,304C.jpg",
+      "text": "303B,304C"
+    },
+    {
+      "src": "images/304.jpg",
+      "text": "304"
+    },
+    {
+      "src": "images/304AB.jpg",
+      "text": "304AB"
+    },
+    {
+      "src": "images/304C.jpg",
+      "text": "304C"
+    },
+    {
+      "src": "images/304D.jpg",
+      "text": "304D"
+    },
+    {
+      "src": "images/305.jpg",
+      "text": "305"
+    },
+    {
+      "src": "images/305A,307B.jpg",
+      "text": "305A,307B"
+    },
+    {
+      "src": "images/305BC.jpg",
+      "text": "305BC"
+    },
+    {
+      "src": "images/305D.jpg",
+      "text": "305D"
+    },
+    {
+      "src": "images/307.jpg",
+      "text": "307"
+    },
+    {
+      "src": "images/307A01,C.jpg",
+      "text": "307A01,C"
+    },
+    {
+      "src": "images/307A02,D01.jpg",
+      "text": "/307A02,D01"
+    },
+    {
+      "src": "images/307D00,D02.jpg",
+      "text": "307D00,D02"
+    },
+    {
+      "src": "images/311.jpg",
+      "text": "311"
+    },
+    {
+      "src": "images/311B,312D.jpg",
+      "text": "311B,312D"
+    },
+    {
+      "src": "images/312.jpg",
+      "text": "312"
+    },
+    {
+      "src": "images/312AB.jpg",
+      "text": "312AB"
+    },
+    {
+      "src": "images/313.jpg",
+      "text": "313"
+    },
+    {
+      "src": "images/313AD.jpg",
+      "text": "313AD"
+    },
+    {
+      "src": "images/314A,315B.jpg",
+      "text": "314A,315B"
+    },
+    {
+      "src": "images/315AC.jpg",
+      "text": "315AC"
+    },
+    {
+      "src": "images/315D.jpg",
+      "text": "315D"
+    },
+    {
+      "src": "images/319.jpg",
+      "text": "319"
+    },
+    {
+      "src": "images/319A,C00.jpg",
+      "text": "319A,C00"
+    },
+    {
+      "src": "images/319B.jpg",
+      "text": "319B"
+    },
+    {
+      "src": "images/319C01,D.jpg",
+      "text": "319C01,D"
+    }
+  ]
+};
+    const campNames = Object.keys(DATA);
+    const content = document.getElementById('content');
+    const searchInput = document.getElementById('searchInput');
+    const campTabs = document.getElementById('campTabs');
+    const letterChips = document.getElementById('letterChips');
+    const totalCount = document.getElementById('totalCount');
+    const visibleCount = document.getElementById('visibleCount');
+    const campCount = document.getElementById('campCount');
+    const emptyState = document.getElementById('emptyState');
+
+    const allItems = campNames.flatMap(camp => DATA[camp].map(item => ({ ...item, camp })));
+    totalCount.textContent = allItems.length;
+    campCount.textContent = campNames.length;
+
+    const state = { search: '', camp: '전체', letter: '전체' };
+
+    function classifyLetter(text) {
+      const match = text.match(/[A-D]/i);
+      return match ? match[0].toUpperCase() : '기타';
+    }
+
+    function makeButton(label, current, onClick, extraClass='chip') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = extraClass + (label === current ? ' active' : '');
+      btn.textContent = label;
+      btn.addEventListener('click', onClick);
+      return btn;
+    }
+
+    function renderFilters() {
+      campTabs.innerHTML = '';
+      ['전체', ...campNames].forEach(name => {
+        campTabs.appendChild(makeButton(name, state.camp, () => { state.camp = name; render(); }, 'tab'));
+      });
+
+      letterChips.innerHTML = '';
+      ['전체', 'A', 'B', 'C', 'D', '기타'].forEach(name => {
+        letterChips.appendChild(makeButton(name, state.letter, () => { state.letter = name; render(); }));
+      });
+    }
+
+    function normalized(text) {
+      return text.toLowerCase().replace(/\s+/g, '');
+    }
+
+    function matches(item) {
+      const search = normalized(state.search);
+      const bySearch = !search || normalized(item.text).includes(search) || normalized(item.src).includes(search);
+      const byCamp = state.camp === '전체' || item.camp === state.camp;
+      const byLetter = state.letter === '전체' || classifyLetter(item.text) === state.letter;
+      return bySearch && byCamp && byLetter;
+    }
+
+    function createCard(item) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'card';
+      card.setAttribute('aria-label', `${item.text} 확대 보기`);
+
+      const thumbWrap = document.createElement('div');
+      thumbWrap.className = 'thumb-wrap';
+
+      const img = document.createElement('img');
+      img.src = item.src;
+      img.alt = item.text;
+      img.loading = 'lazy';
+      img.onerror = () => {
+        thumbWrap.innerHTML = `<div class="img-fallback">이미지를 찾을 수 없습니다.<br><small>${item.src}</small></div>`;
+      };
+      thumbWrap.appendChild(img);
+
+      const caption = document.createElement('div');
+      caption.className = 'caption';
+      caption.innerHTML = `<div class="caption-text">${item.text}</div><div class="caption-camp">${item.camp}</div>`;
+
+      card.appendChild(thumbWrap);
+      card.appendChild(caption);
+      card.addEventListener('click', () => openModal(item));
+      return card;
+    }
+
+    function render() {
+      renderFilters();
+      content.innerHTML = '';
+      let visible = 0;
+
+      campNames.forEach(camp => {
+        const items = DATA[camp]
+          .map(item => ({ ...item, camp }))
+          .filter(matches);
+
+        if (!items.length) return;
+
+        visible += items.length;
+        const section = document.createElement('section');
+        section.className = 'section';
+        section.innerHTML = `
+          <div class="section-head">
+            <h2 class="section-title">📌 ${camp}</h2>
+            <div class="section-count">${items.length}개 표시</div>
+          </div>
+          <div class="gallery"></div>
+        `;
+        const gallery = section.querySelector('.gallery');
+        items.forEach(item => gallery.appendChild(createCard(item)));
+        content.appendChild(section);
+      });
+
+      visibleCount.textContent = visible;
+      emptyState.style.display = visible ? 'none' : 'block';
+    }
+
+    searchInput.addEventListener('input', (e) => {
+      state.search = e.target.value || '';
+      render();
+    });
+
+    render();
+
+    const modal = document.getElementById('modal');
+    const modalImg = document.getElementById('modalImg');
+    const modalCaption = document.getElementById('modalCaption');
+    const zoomShell = document.getElementById('zoomShell');
+    const modalStage = document.getElementById('modalStage');
+    const closeBtn = document.getElementById('closeBtn');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const zoom = { scale: 1, x: 0, y: 0, startX: 0, startY: 0, dragging: false, pinchStart: 0, pinchScale: 1 };
+
+    function applyZoom() {
+      zoomShell.style.transform = `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`;
+    }
+    function resetZoom() {
+      zoom.scale = 1; zoom.x = 0; zoom.y = 0; applyZoom();
+    }
+    function setScale(next) {
+      zoom.scale = Math.min(5, Math.max(1, next));
+      if (zoom.scale === 1) { zoom.x = 0; zoom.y = 0; }
+      applyZoom();
+    }
+    function distance(touches) {
+      const [a, b] = touches;
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    }
+    function openModal(item) {
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      modalImg.src = item.src;
+      modalImg.alt = item.text;
+      modalCaption.textContent = `${item.camp} · ${item.text}`;
+      modalImg.onerror = () => {
+        modalCaption.textContent = `${item.camp} · ${item.text} (이미지 경로 확인 필요: ${item.src})`;
+      };
+      resetZoom();
+    }
+    function closeModal() {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalImg.src = '';
+      resetZoom();
+    }
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    zoomInBtn.addEventListener('click', () => setScale(zoom.scale + 0.25));
+    zoomOutBtn.addEventListener('click', () => setScale(zoom.scale - 0.25));
+    resetBtn.addEventListener('click', resetZoom);
+
+    modalStage.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      setScale(zoom.scale + (e.deltaY < 0 ? 0.2 : -0.2));
+    }, { passive: false });
+
+    modalStage.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        zoom.pinchStart = distance(e.touches);
+        zoom.pinchScale = zoom.scale;
+      } else if (e.touches.length === 1 && zoom.scale > 1) {
+        zoom.dragging = true;
+        zoom.startX = e.touches[0].clientX - zoom.x;
+        zoom.startY = e.touches[0].clientY - zoom.y;
+      }
+    }, { passive: true });
+
+    modalStage.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2) {
+        const nextDistance = distance(e.touches);
+        setScale(zoom.pinchScale * (nextDistance / zoom.pinchStart));
+      } else if (e.touches.length === 1 && zoom.dragging) {
+        zoom.x = e.touches[0].clientX - zoom.startX;
+        zoom.y = e.touches[0].clientY - zoom.startY;
+        applyZoom();
+      }
+    }, { passive: true });
+
+    modalStage.addEventListener('touchend', () => { zoom.dragging = false; });
+
+    modalStage.addEventListener('mousedown', (e) => {
+      if (zoom.scale <= 1) return;
+      zoom.dragging = true;
+      zoom.startX = e.clientX - zoom.x;
+      zoom.startY = e.clientY - zoom.y;
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!zoom.dragging) return;
+      zoom.x = e.clientX - zoom.startX;
+      zoom.y = e.clientY - zoom.startY;
+      applyZoom();
+    });
+    window.addEventListener('mouseup', () => { zoom.dragging = false; });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+      if (e.key === '+' || e.key === '=') setScale(zoom.scale + 0.2);
+      if (e.key === '-') setScale(zoom.scale - 0.2);
+    });
+  </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
